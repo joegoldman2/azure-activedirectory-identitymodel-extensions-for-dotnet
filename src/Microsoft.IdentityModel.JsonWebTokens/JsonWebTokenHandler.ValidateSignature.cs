@@ -191,7 +191,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens
             {
                 SecurityKey key = keysList[i];
                 ValidationResult<SecurityKey> result = ValidateSignatureWithKey(jwtToken, key, validationParameters, callContext);
-                if (result.IsSuccess)
+                if (result.IsValid)
                 {
                     jwtToken.SigningKey = key;
                     return (result, true, null);
@@ -240,15 +240,30 @@ namespace Microsoft.IdentityModel.JsonWebTokens
                 validationParameters,
                 callContext);
 
-            if (!result.IsSuccess)
-                return new ValidationError(
-                    new MessageDetail(
-                        TokenLogMessages.IDX10518,
-                        result.UnwrapError().MessageDetail.Message),
-                    ValidationFailureType.SignatureValidationFailed,
-                    typeof(SecurityTokenInvalidSignatureException),
-                    new StackFrame(true),
-                    result.UnwrapError());
+            if (!result.IsValid)
+            {
+                if (result.UnwrapError() is AlgorithmValidationError algorithmValidationError)
+                {
+                    return new AlgorithmValidationError(
+                        new MessageDetail(
+                            TokenLogMessages.IDX10518,
+                            algorithmValidationError.MessageDetail.Message),
+                        typeof(SecurityTokenInvalidAlgorithmException),
+                        new StackFrame(true),
+                        algorithmValidationError.InvalidAlgorithm);
+                }
+                else
+                {
+                    // overridden delegate did not return an AlgorithmValidationError
+                    return new ValidationError(
+                        new MessageDetail(
+                            TokenLogMessages.IDX10518,
+                            result.UnwrapError().MessageDetail.Message),
+                        ValidationFailureType.SignatureAlgorithmValidationFailed,
+                        typeof(SecurityTokenInvalidAlgorithmException),
+                        new StackFrame(true));
+                }
+            }
 
             SignatureProvider signatureProvider = cryptoProviderFactory.CreateForVerifying(key, jsonWebToken.Alg);
             try

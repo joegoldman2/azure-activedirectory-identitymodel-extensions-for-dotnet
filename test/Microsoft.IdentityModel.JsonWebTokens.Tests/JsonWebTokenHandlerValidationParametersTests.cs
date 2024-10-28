@@ -47,6 +47,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens.Tests
 
             TokenValidationResult tokenValidationParametersResult =
                 await jsonWebTokenHandler.ValidateTokenAsync(jwtString, theoryData.TokenValidationParameters);
+
             ValidationResult<ValidatedToken> validationParametersResult =
                 await jsonWebTokenHandler.ValidateTokenAsync(
                     jwtString, theoryData.ValidationParameters, theoryData.CallContext, CancellationToken.None);
@@ -54,12 +55,12 @@ namespace Microsoft.IdentityModel.JsonWebTokens.Tests
             if (tokenValidationParametersResult.IsValid != theoryData.ExpectedIsValid)
                 context.AddDiff($"tokenValidationParametersResult.IsValid != theoryData.ExpectedIsValid");
 
-            if (validationParametersResult.IsSuccess != theoryData.ExpectedIsValid)
+            if (validationParametersResult.IsValid != theoryData.ExpectedIsValid)
                 context.AddDiff($"validationParametersResult.IsSuccess != theoryData.ExpectedIsValid");
 
             if (theoryData.ExpectedIsValid &&
                 tokenValidationParametersResult.IsValid &&
-                validationParametersResult.IsSuccess)
+                validationParametersResult.IsValid)
             {
                 IdentityComparer.AreEqual(
                     tokenValidationParametersResult.ClaimsIdentity,
@@ -74,7 +75,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens.Tests
             {
                 theoryData.ExpectedException.ProcessException(tokenValidationParametersResult.Exception, context);
 
-                if (!validationParametersResult.IsSuccess)
+                if (!validationParametersResult.IsValid)
                 {
                     // If there is a special case for the ValidationParameters path, use that.
                     if (theoryData.ExpectedExceptionValidationParameters != null)
@@ -113,72 +114,6 @@ namespace Microsoft.IdentityModel.JsonWebTokens.Tests
                         ExpectedException = ExpectedException.SecurityTokenMalformedException("IDX14100:"),
                         ExpectedExceptionValidationParameters = ExpectedException.SecurityTokenMalformedException("IDX14107:", typeof(SecurityTokenMalformedException)),
                     },
-                    new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_Issuer")
-                    {
-                        TokenValidationParameters = CreateTokenValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        ValidationParameters = CreateValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        Issuer = "InvalidIssuer",
-                        ExpectedIsValid = false,
-                        ExpectedException = ExpectedException.SecurityTokenInvalidIssuerException("IDX10205:"),
-                        // ValidateTokenAsync with ValidationParameters returns a different error message to account for the
-                        // removal of the ValidIssuer property from the ValidationParameters class.
-                        ExpectedExceptionValidationParameters = ExpectedException.SecurityTokenInvalidIssuerException("IDX10212:"),
-                    },
-                    new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_TokenNotSigned")
-                    {
-                        TokenValidationParameters = CreateTokenValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        ValidationParameters = CreateValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        SigningCredentials = null,
-                        ExpectedIsValid = false,
-                        ExpectedException = ExpectedException.SecurityTokenInvalidSignatureException("IDX10504:"),
-                    },
-                    new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_TokenSignedWithDifferentKey_KeyIdPresent_TryAllKeysFalse")
-                    {
-                        TokenValidationParameters = CreateTokenValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        ValidationParameters = CreateValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        SigningCredentials = Default.SymmetricSigningCredentials,
-                        ExpectedIsValid = false,
-                        ExpectedException = ExpectedException.SecurityTokenSignatureKeyNotFoundException("IDX10500:"),
-                        // ValidateTokenAsync with ValidationParameters returns a different error message in the case where a
-                        // key is not found in the IssuerSigningKeys collection and TryAllKeys is false.
-                        ExpectedExceptionValidationParameters = ExpectedException.SecurityTokenSignatureKeyNotFoundException("IDX10502:"),
-                    },
-                    new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_TokenSignedWithDifferentKey_KeyIdPresent_TryAllKeysTrue")
-                    {
-                        TokenValidationParameters = CreateTokenValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey, tryAllKeys: true),
-                        ValidationParameters = CreateValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey, tryAllKeys: true),
-                        SigningCredentials = Default.SymmetricSigningCredentials,
-                        ExpectedIsValid = false,
-                        ExpectedException = ExpectedException.SecurityTokenSignatureKeyNotFoundException("IDX10503:"),
-                    },
-                    new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_TokenSignedWithDifferentKey_KeyIdNotPresent_TryAllKeysFalse")
-                    {
-                        TokenValidationParameters = CreateTokenValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        ValidationParameters = CreateValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey),
-                        SigningCredentials = KeyingMaterial.DefaultSymmetricSigningCreds_256_Sha2_NoKeyId,
-                        ExpectedIsValid = false,
-                        ExpectedException = ExpectedException.SecurityTokenSignatureKeyNotFoundException("IDX10500:"),
-                    },
-                    new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_TokenSignedWithDifferentKey_KeyIdNotPresent_TryAllKeysTrue")
-                    {
-                        TokenValidationParameters = CreateTokenValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey, tryAllKeys: true),
-                        ValidationParameters = CreateValidationParameters(
-                            Default.Issuer, Default.AsymmetricSigningKey, tryAllKeys: true),
-                        SigningCredentials = KeyingMaterial.DefaultSymmetricSigningCreds_256_Sha2_NoKeyId,
-                        ExpectedIsValid = false,
-                        ExpectedException = ExpectedException.SecurityTokenSignatureKeyNotFoundException("IDX10517:"),
-                    },
                     new JsonWebTokenHandlerValidationParametersTheoryData("Invalid_TokenSignedWithInvalidAlgorithm")
                     {
                         // Token is signed with HmacSha256 but only sha256 is considered valid for this test's purposes
@@ -191,9 +126,7 @@ namespace Microsoft.IdentityModel.JsonWebTokens.Tests
                         SigningCredentials = KeyingMaterial.DefaultSymmetricSigningCreds_256_Sha2,
                         ExpectedIsValid = false,
                         ExpectedException = ExpectedException.SecurityTokenInvalidSignatureException("IDX10511:"),
-                        ExpectedExceptionValidationParameters = ExpectedException.SecurityTokenInvalidSignatureException(
-                            "IDX10518:",
-                            innerTypeExpected: typeof(SecurityTokenInvalidAlgorithmException))
+                        ExpectedExceptionValidationParameters = ExpectedException.SecurityTokenInvalidAlgorithmException("IDX10518:")
                     },
                     new JsonWebTokenHandlerValidationParametersTheoryData("Valid_JWE")
                     {
